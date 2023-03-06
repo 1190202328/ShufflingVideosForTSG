@@ -146,7 +146,7 @@ def retrieval_eval(filename):
 
     print('\tmIoU\t', '\t'.join([str(i) for i in tIoU_lst]))
 
-    print('\n => ')
+    print('\n=> ')
     for i, topn in enumerate(topn_lst):
         print(topn, '\t', mIoU, '\t', '\t'.join([str(round(i * 100, 2)) for i in recall[i].tolist()]))
 

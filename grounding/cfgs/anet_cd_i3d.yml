@@ -7,7 +7,8 @@ val_data: '../data/ANet-CD/anet_val.json'
 valid_featpath: '../data/ANet/i3d_feature'
 
 test: 'anet'
-test_data: '../data/ANet-CD/anet_test_ood.json'
+#test_data: '../data/ANet-CD/anet_test_ood.json'
+test_data: '../data/ANet-CD/anet_test_iid.json'
 test_featpath: '../data/ANet/i3d_feature'
 
 wordtoix_path: '../data/ANet/words/wordtoix.npy'

@@ -21,7 +21,7 @@ def constract_model(params, logger):
     if params['start_from'] is not None:
         state_dict = torch.load(params['start_from'],
                                 map_location=lambda storage, location: storage)
-        logger.warn('use checkpoint: %s', params['start_from'])
+        logger.warning('use checkpoint: %s', params['start_from'])
 
     video_seq_set = {}
     video_seq_set['name'] = params['video_encoder']
