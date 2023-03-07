@@ -8,6 +8,7 @@ import yaml
 
 import torch
 from torch.utils.data import DataLoader
+from tqdm import tqdm
 
 from util.model_saver import ModelSaver
 from util.helper_function import set_device, StatisticsPrint, LoggerInfo, update_values, group_weight
@@ -15,6 +16,7 @@ from model.SpanGroundMatchDisc import GMD
 from loss import temporal_order_discrimination_loss, span_ground_loss, BCE_loss, \
     matching_KL_divergence, span_pred, compute_mean_iou
 from model.networks.attention import masked_softmax
+
 
 def perpare_data(batch_data):
     sent_list, sent_feat, sent_len, sent_mask, \
@@ -37,9 +39,10 @@ def perpare_data(batch_data):
         pseudo_gt[k] = pseudo_gt[k].cuda()
 
     return sent_list, sent_feat, sent_len, sent_mask, \
-            video_duration, vid_list, \
-            ori_video_feat, ori_nfeats, ori_video_mask, ori_gt, \
-            pseudo_video_feat, pseudo_nfeats, pseudo_video_mask, pseudo_gt
+           video_duration, vid_list, \
+           ori_video_feat, ori_nfeats, ori_video_mask, ori_gt, \
+           pseudo_video_feat, pseudo_nfeats, pseudo_video_mask, pseudo_gt
+
 
 def constract_model(params, logger):
     # if params['start_from'] is not None:
@@ -74,7 +77,7 @@ def constract_model(params, logger):
     grounding_set['mlp_hidden_dim'] = params['mlp_hidden_dim']
 
     # matching
-    matching_set= {}
+    matching_set = {}
     cross_set, temporal_set, predict_set = {}, {}, {}
     cross_set['name'] = params['m_cross']
     temporal_set['name'] = params['m_temp']
@@ -102,6 +105,7 @@ def constract_model(params, logger):
     #     print("load over.", params['start_from'])
 
     return model
+
 
 def train(model, data_loader, params, logger, step, optimizer, criterion_domain, dataset):
     model.train()
@@ -144,9 +148,8 @@ def train(model, data_loader, params, logger, step, optimizer, criterion_domain,
         # Cross-Modal Semantic Matching Loss
         #   m1: intra-video
         loss_intra = params['loss_m1_lambda'] * ( \
-        BCE_loss(ori_match_prob, ori_gt['temporal_labels'], ori_video_mask) + \
-        BCE_loss(pseudo_match_prob, pseudo_gt['temporal_labels'], pseudo_video_mask) )
-
+                    BCE_loss(ori_match_prob, ori_gt['temporal_labels'], ori_video_mask) + \
+                    BCE_loss(pseudo_match_prob, pseudo_gt['temporal_labels'], pseudo_video_mask))
 
         #   m2: inter-videos
         ori_mask = ori_gt['temporal_labels']
@@ -161,9 +164,8 @@ def train(model, data_loader, params, logger, step, optimizer, criterion_domain,
 
         # Temporal Order Discrimination Loss
         loss_disc = temporal_order_discrimination_loss(ori_disc_prob, pseudo_disc_prob,
-                                                    criterion_domain)
+                                                       criterion_domain)
         loss = loss_g + loss_intra + loss_inter + params['loss_disc_lambda'] * loss_disc
-
 
         optimizer.zero_grad()
         loss.backward()
@@ -173,13 +175,13 @@ def train(model, data_loader, params, logger, step, optimizer, criterion_domain,
 
         # statics
         pred_time, score = span_pred(ori_span_prob['start'].cpu(), ori_span_prob['end'].cpu())
-        pred_time = dataset.frame2sec(pred_time.float(), duration= video_duration, nfeats= ori_nfeats)
+        pred_time = dataset.frame2sec(pred_time.float(), duration=video_duration, nfeats=ori_nfeats)
         miou = compute_mean_iou(pred_time.float().data, ori_gt['timestps'].data)
 
         accumulate_iou += miou.cpu().item()
         accumulate_loss += loss.cpu().item()
         accumulate_loss_g += loss_g.cpu().item()
-        accumulate_loss_m1 +=  loss_intra.cpu().item()
+        accumulate_loss_m1 += loss_intra.cpu().item()
         accumulate_loss_m2 += loss_inter.cpu().item()
         accumulate_loss_d += loss_disc.cpu().item()
 
@@ -192,7 +194,7 @@ def train(model, data_loader, params, logger, step, optimizer, criterion_domain,
                 loss_intra.cpu().item(),
                 loss_inter.cpu().item(),
                 loss_disc.cpu().item() if ['discriminative'] else 0
-                )
+            )
 
     logger.info('epoch [%03d]: elapsed time:%0.2fs, avg loss: %03.3f, miou: %03.3f, '
                 'avg loss_g: %03.3f, avg loss_intra: %03.3f, avg loss_inter: %03.3f, avg loss_d: %03.3f,',
@@ -205,6 +207,7 @@ def train(model, data_loader, params, logger, step, optimizer, criterion_domain,
     logger.info('*' * 100)
 
     return accumulate_loss / len(data_loader)
+
 
 def valid(model, data_loader, params, logger, step, saver, dataset):
     model.eval()
@@ -254,8 +257,8 @@ def valid(model, data_loader, params, logger, step, saver, dataset):
             # Cross-Modal Semantic Matching Loss
             #   m1: intra-video
             loss_intra = params['loss_m1_lambda'] * ( \
-            BCE_loss(ori_match_prob, ori_gt['temporal_labels'], ori_video_mask) + \
-            BCE_loss(pseudo_match_prob, pseudo_gt['temporal_labels'], pseudo_video_mask))
+                        BCE_loss(ori_match_prob, ori_gt['temporal_labels'], ori_video_mask) + \
+                        BCE_loss(pseudo_match_prob, pseudo_gt['temporal_labels'], pseudo_video_mask))
 
             #   m2: inter-videos
             ori_mask = ori_gt['temporal_labels']
@@ -271,7 +274,7 @@ def valid(model, data_loader, params, logger, step, saver, dataset):
             # Temporal Order Discrimination Loss
             # loss_disc = temporal_order_discrimination_loss(ori_disc_prob, pseudo_disc_prob,
             #                                                criterion_domain)
-            loss = loss_g + loss_intra + loss_inter #+ params['loss_disc_lambda'] * loss_disc
+            loss = loss_g + loss_intra + loss_inter  # + params['loss_disc_lambda'] * loss_disc
 
             pred_time, score = span_pred(ori_span_prob['start'].cpu(), ori_span_prob['end'].cpu())
             pred_time = dataset.frame2sec(pred_time.float(), duration=video_duration, nfeats=ori_nfeats)
@@ -317,6 +320,7 @@ def valid(model, data_loader, params, logger, step, saver, dataset):
 
     return accumulate_iou / len(data_loader)
 
+
 def select_dataset_and_cfn(dataset_name):
     if dataset_name in ['charades', 'charades_cd']:
         from dataset.charades_pair_aug import collate_fn, CharadesVideoAugVideoPair
@@ -329,6 +333,7 @@ def select_dataset_and_cfn(dataset_name):
     else:
         assert False, 'Error datasetname' + dataset_name
     return data_class, cfn
+
 
 def main(params):
     logging.basicConfig()
@@ -381,16 +386,16 @@ def main(params):
 
     if params['lr_schd'].lower() in ['multistep', 'ms']:
         lr_scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer,
-                                                        milestones=params['lr_step'], gamma=params["lr_decay_rate"])
+                                                            milestones=params['lr_step'], gamma=params["lr_decay_rate"])
     elif params['lr_schd'].lower() in ['lambda', 'l']:
-        lambda1 = lambda epoch: params['lr'] - epoch*1e-6
+        lambda1 = lambda epoch: params['lr'] - epoch * 1e-6
         lr_scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda=lambda1, last_epoch=-1)
 
     criterion_domain = torch.nn.CrossEntropyLoss().cuda()
 
     statistics = {'loss': {}, 'mIoU': {}}
     # valid(model, valid_loader, params, logger, 0, saver, valid_set)
-    for step in range(params['epoch']):
+    for step in tqdm(range(params['epoch'])):
         # train
         loss = train(model, train_loader, params, logger, step, optimizer, criterion_domain, train_set)
         lr_scheduler.step()
@@ -401,9 +406,10 @@ def main(params):
             LoggerInfo(logger, 'loss statistics:', statistics['loss'])
         if (step + 1) % params['test_interval'] == 0:
             mIoU = valid(model, valid_loader, params, logger, step, saver, valid_set)
-            statistics['mIoU'][step] = round(mIoU*100, 2)
+            statistics['mIoU'][step] = round(mIoU * 100, 2)
             LoggerInfo(logger, 'mIoU statistics:', statistics['mIoU'])
-        if (step + 1) % params['save_model_interval'] == 0 or (step + 1) == params['epoch']:
+        if ((step + 1) % params['save_model_interval'] == 0 or (step + 1) == params['epoch']) and step + 1 >= params[
+            'start_save_epoch']:
             save_path = saver.save_model_path(step)
             torch.save(model.module.state_dict(), save_path)
             logger.info('Save model in %s', save_path)
@@ -560,7 +566,6 @@ if __name__ == '__main__':
     parser.add_argument('--span_hidden_dim', type=int, default=128,
                         help='hidden dimension of rnn')
 
-
     # Matching setting
     parser.add_argument('--m_cross', type=str, default="concat",
                         help='')
@@ -573,16 +578,19 @@ if __name__ == '__main__':
     parser.add_argument('--m_pred_hidden', type=int, default=1024,
                         help='')
 
+    # myself define
+    parser.add_argument('--start_save_epoch', type=int, default=0,
+                        help='')
+
     params = parser.parse_args()
     params = vars(params)
 
     cfgs_file = params['cfg']
-    cfgs_file = os.path.join('cfgs',cfgs_file)
+    cfgs_file = os.path.join('cfgs', cfgs_file)
     with open(cfgs_file, 'r') as handle:
         options_yaml = yaml.load(handle, Loader=yaml.FullLoader)
     update_values(options_yaml, params)
     # print(params)
-
 
     main(params)
     print('Training finished successfully!')

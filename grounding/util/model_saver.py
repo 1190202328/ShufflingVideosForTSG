@@ -71,11 +71,12 @@ class ModelSaver(object):
                                                       ))
         return model_path
 
-    def save_submits(self, submits, step, key='val_data'):
-        file_name = os.path.join(self.submits_folder,
-                                 '%s_%05d_%s.json' % (self.params['alias'],
-                                    step, self.params[key].split('/')[-1].split('.')[0],
-                                    ))
+    def save_submits(self, submits, step, key='val_data', file_name=None):
+        if not file_name:
+            file_name = os.path.join(self.submits_folder,
+                                     '%s_%05d_%s.json' % (self.params['alias'],
+                                        step, self.params[key].split('/')[-1].split('.')[0],
+                                        ))
         with open(file_name, 'w') as file:
             json.dump(submits, file)
 

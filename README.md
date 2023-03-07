@@ -42,7 +42,7 @@ cd grounding
 
 Train:
 ```
-python train.py --gpu_id=0 --cfg charades_cd_i3d.yml --alias one_name
+python train.py --gpu_id=0 --cfg charades_cd_i3d.yml --alias train
 ```
 The checkpoints and prediction results will be saved in `grounding/runs/DATASET/`
 
@@ -57,7 +57,7 @@ You can change the model to be evaluated in the corresponding config file. By de
 
 Train:
 ```
-python train.py --gpu_id=0 --cfg anet_cd_i3d.yml --alias one_name
+python train.py --gpu_id=0 --cfg anet_cd_i3d.yml --alias train
 ```
 Evaluate:
 ```
@@ -77,7 +77,7 @@ We also provide the implementation of the baseline ([QAVE](https://dl.acm.org/do
 
 Train:
 ```
-python train_baseline.py --gpu_id=0 --cfg charades_cd_i3d.yml --alias one_name
+python train_baseline.py --gpu_id=0 --cfg charades_cd_i3d.yml --alias train
 ```
 Evaluate:
 ```
@@ -90,7 +90,7 @@ Please determine the model to be evaluated in the corresponding config file.
 
 Train:
 ```
-python train_baseline.py --gpu_id=0 --cfg anet_cd_i3d.yml --alias one_name
+python train_baseline.py --gpu_id=0 --cfg anet_cd_i3d.yml --alias train
 ```
 Evaluate:
 ```

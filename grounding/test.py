@@ -1,4 +1,7 @@
 import argparse
+import re
+import shutil
+
 import numpy
 import logging
 import sys
@@ -8,6 +11,7 @@ import yaml
 
 import torch
 from torch.utils.data import DataLoader
+from tqdm import tqdm
 
 from util.model_saver import ModelSaver
 from util.helper_function import set_device, StatisticsPrint, LoggerInfo, update_values, group_weight
@@ -50,7 +54,7 @@ def constract_model(params, logger):
     grounding_set['mlp_hidden_dim'] = params['mlp_hidden_dim']
 
     # matching
-    matching_set= {}
+    matching_set = {}
     cross_set, temporal_set, predict_set = {}, {}, {}
     cross_set['name'] = params['m_cross']
     temporal_set['name'] = params['m_temp']
@@ -79,7 +83,8 @@ def constract_model(params, logger):
 
     return model
 
-def test(model, data_loader, params, logger, step, saver, dataset):
+
+def test(model, data_loader, params, logger, step, saver, dataset, submit_filename=None):
     model.eval()
 
     _start_time = time.time()
@@ -101,7 +106,7 @@ def test(model, data_loader, params, logger, step, saver, dataset):
         sent_list, sent_feat, sent_len, sent_mask, \
         video_duration, vid_list, \
         video_feat, nfeats, video_mask, gt, \
-        _,_,_,_ = perpare_data(batch_data)
+        _, _, _, _ = perpare_data(batch_data)
 
         B, T, _ = video_feat.size()
 
@@ -141,7 +146,7 @@ def test(model, data_loader, params, logger, step, saver, dataset):
                 'video_duration': video_duration[idx].tolist(),
             })
 
-    submit_filename = saver.save_submits(pred_dict, step, 'test_data')
+    submit_filename = saver.save_submits(pred_dict, step, 'test_data', file_name=submit_filename)
     logger.info('epoch [%03d]: elapsed time:%0.4fs, avg loss: %03.3f, miou: %03.3f',
                 step, time.time() - _start_time,
                 accumulate_loss / len(data_loader), accumulate_iou / len(data_loader))
@@ -163,7 +168,8 @@ def select_dataset_and_cfn(dataset_name):
         assert False, 'Error datasetname' + dataset_name
     return data_class, cfn
 
-def main(params):
+
+def main(params, step):
     logging.basicConfig()
     logger = logging.getLogger(params['alias'])
     gpu_id = set_device(logger, params['gpu_id'])
@@ -183,11 +189,13 @@ def main(params):
         logger
     )
     test_loader = DataLoader(test_set, batch_size=params['batch_size'][0],
-                              shuffle=False, num_workers=4, collate_fn=source_cfn)
+                             shuffle=False, num_workers=4, collate_fn=source_cfn)
 
-    iou, submit_filename = test(model, test_loader, params, logger, 0, saver, test_set)
+    iou, submit_filename = test(model, test_loader, params, logger, step, saver, test_set)
 
-    retrieval_eval(submit_filename)
+    mIoU, recall = retrieval_eval(submit_filename)
+
+    return mIoU, recall, submit_filename
 
 
 if __name__ == '__main__':
@@ -350,17 +358,50 @@ if __name__ == '__main__':
     parser.add_argument('--m_pred_hidden', type=int, default=1024,
                         help='')
 
-
     params = parser.parse_args()
+    start_from_origin = params.start_from
     params = vars(params)
 
     cfgs_file = params['cfg']
-    cfgs_file = os.path.join('cfgs',cfgs_file)
+    cfgs_file = os.path.join('cfgs', cfgs_file)
     with open(cfgs_file, 'r') as handle:
         options_yaml = yaml.load(handle, Loader=yaml.FullLoader)
     update_values(options_yaml, params)
     # print(params)
 
+    params['start_from'] = start_from_origin if start_from_origin else params['start_from']
+    if os.path.isdir(params['start_from']):
+        start_from_list = sorted(os.listdir(params['start_from']), reverse=True)
+        start_from_list = [f'{params["start_from"]}/{path}' for path in start_from_list]
+        best_model_save_dir = os.path.dirname(params['start_from'])
+        save_best = True
+    else:
+        start_from_list = [params['start_from']]
+        best_model_save_dir = os.path.dirname(os.path.dirname(params['start_from']))
+        save_best = False
+    save_model_prefix, _ = os.path.splitext(params['test_data'])
+    save_model_prefix = save_model_prefix.split('/')[-1]
 
-    main(params)
-    print('Testing finished successfully!')
+    best_model_file = ''
+    best_val = -1
+    for start_from in tqdm(start_from_list):
+        if not start_from.endswith('.ckp'):
+            continue
+        params['start_from'] = start_from
+        step = int(re.findall('\\d{5}', start_from)[0])
+        val, _, _ = main(params, step)
+        if val > best_val:
+            best_model_file = start_from
+            best_val = val
+    print('\n', '*' * 100)
+    print(f'finished! best map = {best_val}, file is [{best_model_file}]')
+    params['start_from'] = best_model_file
+    step = int(re.findall('\\d{5}', best_model_file)[0])
+    main(params, step)
+    if save_best:
+        best_model_file_suffix = best_model_file.split('/')[-1]
+        best_val_string = f'{best_val}'.replace('.', '_')
+        save_model_path = f'{best_model_save_dir}/{save_model_prefix}_{best_val_string}_{best_model_file_suffix}'
+        if not os.path.exists(save_model_path):
+            shutil.copy(best_model_file, save_model_path)
+            print(f'best model checkpoint saved at [{save_model_path}]')

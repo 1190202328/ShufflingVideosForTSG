@@ -151,6 +151,7 @@ def retrieval_eval(filename):
         print(topn, '\t', mIoU, '\t', '\t'.join([str(round(i * 100, 2)) for i in recall[i].tolist()]))
 
     print('mIoU\t{:.4f}'.format(mIoU))
+    return mIoU, recall
 
 def main(params):
     retrieval_eval(params['submit'])

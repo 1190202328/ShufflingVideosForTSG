@@ -7,8 +7,8 @@ val_data: '../data/Charades-CD/charades_val.json'
 valid_featpath: '../data/Charades/i3d_feature'
 
 test: 'charades'
-#test_data: '../data/Charades-CD/charades_test_ood.json'
-test_data: '../data/Charades-CD/charades_test_iid.json'
+test_data: '../data/Charades-CD/charades_test_ood.json'
+#test_data: '../data/Charades-CD/charades_test_iid.json'
 test_featpath: '../data/Charades/i3d_feature'
 
 wordtoix_path: '../data/Charades/words/wordtoix.npy'
