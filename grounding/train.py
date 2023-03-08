@@ -132,6 +132,33 @@ def train(model, data_loader, params, logger, step, optimizer, criterion_domain,
         ori_video_feat, ori_nfeats, ori_video_mask, ori_gt, \
         pseudo_video_feat, pseudo_nfeats, pseudo_video_mask, pseudo_gt = perpare_data(batch_data)
 
+        # # 输入网络的数据的shape
+        # print(f'sent_feat.shape={sent_feat.shape}')
+        # print(f'sent_mask.shape={sent_mask.shape}')
+        # print(f'ori_video_feat.shape={ori_video_feat.shape}')
+        # print(f'ori_video_mask.shape={ori_video_mask.shape}')
+        # print(f'pseudo_video_feat.shape={pseudo_video_feat.shape}')
+        # print(f'pseudo_video_mask.shape={pseudo_video_mask.shape}')
+        # print(f"ori_gt['temporal_labels'].shape={ori_gt['temporal_labels'].shape}")
+        # print(f"ori_gt['fore_masks'].shape={ori_gt['fore_masks'].shape}")
+        # print(f"ori_gt['back_masks'].shape={ori_gt['back_masks'].shape}")
+        # print(f"pseudo_gt['temporal_labels'].shape={pseudo_gt['temporal_labels'].shape}")
+        # print(f"pseudo_gt['fore_masks'].shape={pseudo_gt['fore_masks'].shape}")
+        # print(f"pseudo_gt['back_masks'].shape={pseudo_gt['back_masks'].shape}")
+        # raise Exception
+        # # sent_feat.shape=torch.Size([32, 15, 300]) # [B, T, C]，句子特征
+        # # sent_mask.shape=torch.Size([32, 15]) # [B, T]，前1后0，句子掩码
+        # # ori_video_feat.shape=torch.Size([32, 128, 1024]) # [B, T, C]，原视频特征
+        # # ori_video_mask.shape=torch.Size([32, 128]) # [B, T]，前1后0，原视频掩码
+        # # pseudo_video_feat.shape=torch.Size([32, 128, 1024]) # [B, T, C]，增广视频特征
+        # # pseudo_video_mask.shape=torch.Size([32, 128]) # [B, T]，增广视频掩码
+        # # ori_gt['temporal_labels'].shape=torch.Size([32, 128]) #[B, T]，原视频类别标签
+        # # ori_gt['fore_masks'].shape=torch.Size([32, 128]) #[B, T]，目标帧范围之前的序列【用于判定视频顺序】
+        # # ori_gt['back_masks'].shape=torch.Size([32, 128]) #[B, T]，目标帧范围之后的序列【用于判定视频顺序】
+        # # pseudo_gt['temporal_labels'].shape=torch.Size([32, 128]) #[B, T]，假视频类别标签
+        # # pseudo_gt['fore_masks'].shape=torch.Size([32, 128]) #[B, T]，目标帧范围之前的序列【用于判定视频顺序】
+        # # pseudo_gt['back_masks'].shape=torch.Size([32, 128]) #[B, T]，目标帧范围之后的序列【用于判定视频顺序】
+
         ori_span_prob, ori_match_prob, pseudo_match_prob, \
         ori_disc_prob, pseudo_disc_prob = model(
             sent_feat, sent_mask,
@@ -140,6 +167,23 @@ def train(model, data_loader, params, logger, step, optimizer, criterion_domain,
             ori_gt['temporal_labels'], ori_gt['fore_masks'], ori_gt['back_masks'],
             pseudo_gt['temporal_labels'], pseudo_gt['fore_masks'], pseudo_gt['back_masks'],
         )
+
+        # # 输出的shape
+        # print(f'ori_span_prob.keys={ori_span_prob.keys()}')
+        # print(f"ori_span_prob['start'].shape={ori_span_prob['start'].shape}")
+        # print(f"ori_span_prob['end'].shape={ori_span_prob['end'].shape}")
+        # print(f'ori_match_prob.shape={ori_match_prob.shape}')
+        # print(f'pseudo_match_prob.shape={pseudo_match_prob.shape}')
+        # print(f'ori_disc_prob.shape={ori_disc_prob.shape}')
+        # print(f'pseudo_disc_prob.shape={pseudo_disc_prob.shape}')
+        # raise Exception
+        # # ori_span_prob.keys=dict_keys(['start', 'end'])
+        # # ori_span_prob['start'].shape=torch.Size([32, 128]) # [B, T]，每一帧属于开始的概率
+        # # ori_span_prob['end'].shape=torch.Size([32, 128]) # [B, T]，每一帧属于结束的概率
+        # # ori_match_prob.shape=torch.Size([32, 128]) # [B, T]，对于query，每一帧的相关性得分
+        # # pseudo_match_prob.shape=torch.Size([32, 128]) # [B, T]，对于query，每一帧的相关性得分
+        # # ori_disc_prob.shape=torch.Size([32, 2]) # [B, 2]，判断是否是按顺序放置的
+        # # pseudo_disc_prob.shape=torch.Size([32, 2]) # [B, 2]，判断是否是按顺序放置的
 
         # LOSS
         # Grounding Loss
@@ -175,6 +219,13 @@ def train(model, data_loader, params, logger, step, optimizer, criterion_domain,
 
         # statics
         pred_time, score = span_pred(ori_span_prob['start'].cpu(), ori_span_prob['end'].cpu())
+
+        # print("pred_time.shape", pred_time.shape)
+        # print("score.shape", score.shape)
+        # raise Exception
+        # # pred_time.shape torch.Size([32, 2]) # [B, 2]，预测的起止时间。根据每个时间段的开始得分加结束得分最高的选出来最佳的时间段。
+        # # score.shape torch.Size([32]) # [B]，预测的时间段的得分
+
         pred_time = dataset.frame2sec(pred_time.float(), duration=video_duration, nfeats=ori_nfeats)
         miou = compute_mean_iou(pred_time.float().data, ori_gt['timestps'].data)
 

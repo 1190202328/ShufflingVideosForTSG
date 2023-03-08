@@ -192,7 +192,8 @@ class CharadesDataSentence(CharadesData):
             if add == self.SAMPLE_LEN:
                 return output_video_fts, framestamps, add
         #print(add)
-
+        # print('add=', add, 'video_fts_shape=', video_fts_shape)
+        # 对相邻帧特征做了一个平均？
         return output_video_fts, framestamps, add
 
     def lg_get_fixed_length_feat(self, feat, timestamps, video_duration):
